@@ -2714,11 +2714,17 @@ if test "$mingw32" = "yes" ; then
     done
 fi
 
+if test "$linux" = "yes" ; then
+    DLLSUF=".so.0"
+    QEMU_CFLAGS="-fPIC $QEMU_CFLAGS"
+    #LIBS="-shared -o"
+fi
+
 confdir=$sysconfdir$confsuffix
 
 tools=
 if test "$softmmu" = yes ; then
-  tools="qemu-img\$(EXESUF) qemu-io\$(EXESUF) $tools"
+  tools="qemu-img\$(EXESUF) qemu-io\$(EXESUF) qemu-img-lib\$(DLLSUF) $tools"
   if [ "$linux" = "yes" -o "$bsd" = "yes" -o "$solaris" = "yes" ] ; then
       tools="qemu-nbd\$(EXESUF) $tools"
     if [ "$guest_agent" = "yes" ]; then
@@ -3247,6 +3253,7 @@ echo "ARLIBS_END=$arlibs_end" >> $config_host_mak
 echo "LIBS+=$LIBS" >> $config_host_mak
 echo "LIBS_TOOLS+=$libs_tools" >> $config_host_mak
 echo "EXESUF=$EXESUF" >> $config_host_mak
+echo "DLLSUF=$DLLSUF" >> $config_host_mak
 echo "LIBS_QGA+=$libs_qga" >> $config_host_mak
 
 # generate list of library paths for linker script
