@@ -33,8 +33,13 @@ endif
 
 LINK = $(call quiet-command,$(CC) $(QEMU_CFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $(1) $(LIBS),"  LINK  $(TARGET_DIR)$@")
 
+DLL = $(call quiet-command,$(CC) $(QEMU_CFLAGS) $(CFLAGS) $(LDFLAGS) -shared -o $@ $(sort $(1)) $(LIBS),"  LINK  $(TARGET_DIR)$@")
+
 %$(EXESUF): %.o
 	$(call LINK,$^)
+
+%$(DLLSUF): 
+	$(call DLL,$^)
 
 %.a:
 	$(call quiet-command,rm -f $@ && $(AR) rcs $@ $^,"  AR    $(TARGET_DIR)$@")
