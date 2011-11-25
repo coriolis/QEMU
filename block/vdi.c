@@ -634,6 +634,48 @@ done:
     qemu_aio_release(acb);
 }
 
+static int vdi_read(BlockDriverState *bs, int64_t sector_num,
+                    uint8_t *buf, int nb_sectors)
+{
+    BDRVVdiState *s = bs->opaque;
+    uint32_t bmap_entry;
+    uint32_t block_index;
+    uint32_t sector_in_block;
+    uint32_t n_sectors;
+    int ret = 0;
+
+    logout("will sync read %u sectors starting at sector %" PRIu64 "\n",
+       nb_sectors, sector_num);
+
+    while (nb_sectors > 0) {
+        block_index = sector_num / s->block_sectors;
+        sector_in_block = sector_num % s->block_sectors;
+        n_sectors = s->block_sectors - sector_in_block;
+        if (n_sectors > nb_sectors) {
+            n_sectors = nb_sectors;
+        }
+        bmap_entry = le32_to_cpu(s->bmap[block_index]);
+        if (bmap_entry == VDI_UNALLOCATED) {
+            /* Block not allocated, return zeros, no need to wait. */
+            memset(buf, 0, n_sectors * SECTOR_SIZE);
+        } else {
+            uint64_t offset = s->header.offset_data / SECTOR_SIZE +
+                (uint64_t)bmap_entry * s->block_sectors +
+                sector_in_block;
+            ret = bdrv_pread(bs->file, offset * SECTOR_SIZE, buf, n_sectors * SECTOR_SIZE);
+            if (ret < 0) {
+                goto done;
+            }
+        }
+        nb_sectors -= n_sectors;
+        buf += n_sectors * SECTOR_SIZE;
+        sector_num += n_sectors;
+    }
+    ret = 0;
+done:
+    return ret;
+}
+
 static BlockDriverAIOCB *vdi_aio_readv(BlockDriverState *bs,
         int64_t sector_num, QEMUIOVector *qiov, int nb_sectors,
         BlockDriverCompletionFunc *cb, void *opaque)
@@ -979,6 +1021,7 @@ static BlockDriver bdrv_vdi = {
     .bdrv_is_allocated = vdi_is_allocated,
     .bdrv_make_empty = vdi_make_empty,
 
+    .bdrv_read = vdi_read,
     .bdrv_aio_readv = vdi_aio_readv,
 #if defined(CONFIG_VDI_WRITE)
     .bdrv_aio_writev = vdi_aio_writev,
