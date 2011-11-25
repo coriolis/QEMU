@@ -46,6 +46,12 @@
   - L2 tables have always a size of one cluster.
 */
 
+#if defined(CONFIG_QCOW2_DEBUG)
+#define logout(fmt, ...) \
+                fprintf(stderr, "qcow2\t%-24s" fmt, __func__, ##__VA_ARGS__)
+#else
+#define logout(fmt, ...) ((void)0)
+#endif
 
 typedef struct {
     uint32_t magic;
@@ -369,6 +375,23 @@ int qcow2_backing_read1(BlockDriverState *bs, QEMUIOVector *qiov,
     return n1;
 }
 
+/* handle reading after the end of the backing file */
+static int qcow2_backing_sync_read1(BlockDriverState *bs, uint8_t *buf,
+                  int64_t sector_num, int nb_sectors)
+{
+    int n1;
+    if ((sector_num + nb_sectors) <= bs->total_sectors)
+        return nb_sectors;
+    if (sector_num >= bs->total_sectors)
+        n1 = 0;
+    else
+        n1 = bs->total_sectors - sector_num;
+
+    memset(buf + 512 * n1, 0, 512 * (nb_sectors - n1));
+
+    return n1;
+}
+
 typedef struct QCowAIOCB {
     BlockDriverAIOCB common;
     int64_t sector_num;
@@ -427,6 +450,71 @@ static int qcow2_schedule_bh(QEMUBHFunc *cb, QCowAIOCB *acb)
     qemu_bh_schedule(acb->bh);
 
     return 0;
+}
+
+static int qcow2_read(BlockDriverState *bs, int64_t sector_num,
+                    uint8_t *buf, int nb_sectors)
+{
+    BDRVQcowState *s = bs->opaque;
+    int index_in_cluster, n1;
+    int ret = 0;
+    int cur_nr_sectors;	/* number of sectors in current iteration */
+    uint64_t cluster_offset;
+
+    logout("will sync read %u sectors starting at sector %" PRIu64 "\n",
+       nb_sectors, sector_num);
+
+    while (nb_sectors > 0) {
+        cur_nr_sectors = nb_sectors;
+        ret = qcow2_get_cluster_offset(bs, sector_num << 9,
+            &cur_nr_sectors, &cluster_offset);
+        if (ret < 0) {
+            goto done;
+        }
+        index_in_cluster = sector_num & (s->cluster_sectors - 1);
+        if (!cluster_offset) {
+            if (bs->backing_hd) {
+                /* read from the base image */
+                n1 = qcow2_backing_sync_read1(bs->backing_hd, buf,
+                    sector_num, cur_nr_sectors);
+                if (n1 > 0) {
+                    ret = bdrv_pread(bs->backing_hd, sector_num * 512, buf, n1 * 512);
+                    if (ret < 0) {
+                        goto done;
+                    }
+                } 
+            } else {
+                /* Note: in this case, no need to wait */
+                memset(buf, 0, 512 * cur_nr_sectors);
+                goto done;
+            }
+        } else if (cluster_offset & QCOW_OFLAG_COMPRESSED) {
+            /* add AIO support for compressed blocks ? */
+            //ret = qcow2_decompress_cluster(bs, acb->cluster_offset);
+            ret = -EIO; // compression not supported in sync path right now
+            if (ret < 0) {
+                goto done;
+            }
+        } else {
+            if ((cluster_offset & 511) != 0) {
+                ret = -EIO;
+                goto done;
+            }
+    
+            ret = bdrv_pread(bs->file, ((cluster_offset >> 9) + index_in_cluster) << 9, buf, cur_nr_sectors << 9);
+            if (ret < 0) {
+                ret = -EIO;
+                goto done;
+            }
+
+        }
+        nb_sectors -= cur_nr_sectors;
+        buf += cur_nr_sectors * 512;
+        sector_num += cur_nr_sectors;
+    }
+    ret = 0;
+done:
+    return ret;
 }
 
 static void qcow2_aio_read_cb(void *opaque, int ret)
@@ -1387,6 +1475,7 @@ static BlockDriver bdrv_qcow2 = {
     .bdrv_set_key       = qcow2_set_key,
     .bdrv_make_empty    = qcow2_make_empty,
 
+    .bdrv_read          = qcow2_read,
     .bdrv_aio_readv     = qcow2_aio_readv,
     .bdrv_aio_writev    = qcow2_aio_writev,
     .bdrv_aio_flush     = qcow2_aio_flush,
