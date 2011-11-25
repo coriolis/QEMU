@@ -1,0 +1,14 @@
+This branch is currently used for generating the qemu image library used by
+vmxray.
+
+Since it is compiled under buildroot/uclibc, it needs to be very minimal.
+Mainline 1.0 qemu since 0.15.1 has ballooned considerably in terms of
+requirements. glib usage has spread throughout the code. glib is big, has other
+dependencies including libintl and is next to impossible to squeeze into a 4MB
+root filesystem. Also, the new coroutine based IO doesn't work well under
+uclibc.
+
+So we have
+- backported split-vmdk support from the 1.0 branch
+- added sync read interfaces to the vdi and qcow2 drivers.
+
