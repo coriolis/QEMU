@@ -23,7 +23,9 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <getopt.h>
+#ifndef EMSCRIPTEN
 #include <err.h>
+#endif
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>

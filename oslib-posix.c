@@ -90,9 +90,11 @@ void qemu_vfree(void *ptr)
 
 void socket_set_nonblock(int fd)
 {
+#ifndef EMSCRIPTEN
     int f;
     f = fcntl(fd, F_GETFL);
     fcntl(fd, F_SETFL, f | O_NONBLOCK);
+#endif
 }
 
 void qemu_set_cloexec(int fd)

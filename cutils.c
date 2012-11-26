@@ -299,6 +299,7 @@ void qemu_iovec_memset_skip(QEMUIOVector *qiov, int c, size_t count,
 }
 
 #ifndef _WIN32
+#ifndef EMSCRIPTEN
 /* Sets a specific flag */
 int fcntl_setfl(int fd, int flag)
 {
@@ -313,6 +314,7 @@ int fcntl_setfl(int fd, int flag)
 
     return 0;
 }
+#endif
 #endif
 
 /*

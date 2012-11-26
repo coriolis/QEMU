@@ -23,7 +23,9 @@ int inet_aton(const char *cp, struct in_addr *ia);
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#ifndef EMSCRIPTEN
 #include <sys/un.h>
+#endif
 
 #define socket_error() errno
 #define closesocket(s) close(s)

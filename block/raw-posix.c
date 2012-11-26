@@ -245,9 +245,11 @@ static int raw_open_common(BlockDriverState *bs, const char *filename,
     } else
 #endif
     {
+#ifndef EMSCRIPTEN
         if (paio_init() < 0) {
             goto out_free_buf;
         }
+#endif
 #ifdef CONFIG_LINUX_AIO
         s->use_aio = 0;
 #endif

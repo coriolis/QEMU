@@ -9,11 +9,16 @@
 #include "qemu-img-lib.h"
 #include <stdio.h>
 
+#ifdef EMISCRITEN
+#include <emscripten/emscripten.h>
+#else
+#define EMSCRIPTEN_KEEPALIVE 
+#endif
 
 /**
  * Function to open qemu image file.
  */
-__declspec(dllexport) void* qemu_img_open(const char *filename)
+EMSCRIPTEN_KEEPALIVE __declspec(dllexport) void* qemu_img_open(const char *filename)
 {
 
     BlockDriverState *bs;
@@ -31,22 +36,25 @@ __declspec(dllexport) void* qemu_img_open(const char *filename)
         fprintf(stderr, "Could not open (error: %d) '%s'", ret, filename);
     }
 
+    printf("Opened file %s\n", filename);
+
     return bs;
 }
 
 /**
  * Function to read qemu image.
  */
-__declspec(dllexport) int qemu_img_read(void *bs, int64_t offset,
+EMSCRIPTEN_KEEPALIVE __declspec(dllexport) int qemu_img_read(void *bs, int64_t offset,
                     uint8_t *buf, size_t len)
 {
+    printf("qemu_rea off=%ld, len=%ld\n", offset, len);
     return bdrv_pread((BlockDriverState *)bs, (uint64_t)offset, buf, len);
 }
 
 /**
  * Function to get image information.
  */
-__declspec(dllexport) int qemu_img_get_info(void *bs, int64_t *nsectors, 
+EMSCRIPTEN_KEEPALIVE __declspec(dllexport) int qemu_img_get_info(void *bs, int64_t *nsectors, 
                                     unsigned int *sect_size, int64_t *size)
 {
     char fmt_name[128];
@@ -55,5 +63,7 @@ __declspec(dllexport) int qemu_img_get_info(void *bs, int64_t *nsectors,
     bdrv_get_geometry(bs, (uint64_t*)nsectors);
     *sect_size = 512;
     *size = *nsectors * (*sect_size);
+
+    printf("Qemu info: sect_size = %ld, size=%ld\n", *sect_size, *size);
     return 0;
 }

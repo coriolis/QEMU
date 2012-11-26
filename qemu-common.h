@@ -73,6 +73,11 @@ struct iovec {
 #define IOV_MAX		1024
 #else
 #include <sys/uio.h>
+
+#ifdef EMSCRIPTEN 
+#define IOV_MAX		1024
+#endif
+
 #endif
 
 typedef int (*fprintf_function)(FILE *f, const char *fmt, ...)
