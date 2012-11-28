@@ -47,7 +47,7 @@ EMSCRIPTEN_KEEPALIVE __declspec(dllexport) void* qemu_img_open(const char *filen
 EMSCRIPTEN_KEEPALIVE __declspec(dllexport) int qemu_img_read(void *bs, int64_t offset,
                     uint8_t *buf, size_t len)
 {
-    printf("qemu_rea off=%ld, len=%ld\n", offset, len);
+    printf("qemu_read off=%ld, len=%ld\n", offset, len);
     return bdrv_pread((BlockDriverState *)bs, (uint64_t)offset, buf, len);
 }
 
