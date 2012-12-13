@@ -539,6 +539,7 @@ static int vmdk_parse_extents(const char *desc, BlockDriverState *bs,
     int64_t flat_offset;
     char extent_path[PATH_MAX];
     BlockDriverState *extent_file;
+    char sudo_fname[512] = { 0 };
 
     while (*p) {
         /* parse extent line:
@@ -547,8 +548,21 @@ static int vmdk_parse_extents(const char *desc, BlockDriverState *bs,
          * RW [size in sectors] SPARSE "file-name.vmdk"
          */
         flat_offset = -1;
+#ifdef EMSCRIPTEN
+        //emscripten cannot scan lld and literal chars
+        //doesn't actually scan lld
+        memset(sudo_fname, 0, sizeof(fname));
+        ret = sscanf(p, "%10s %ld" " %10s %511s %ld",
+                access, &sectors, type, sudo_fname, &flat_offset);
+        if(strlen(sudo_fname) > 2) {
+            memset(fname, 0, sizeof(fname));
+            strncpy(fname, &sudo_fname[1], strlen(sudo_fname)-2);
+        }
+        
+#else
         ret = sscanf(p, "%10s %" SCNd64 " %10s \"%511[^\"]\" %" SCNd64,
                 access, &sectors, type, fname, &flat_offset);
+#endif
         if (ret < 4 || strcmp(access, "RW")) {
             goto next_line;
         } else if (!strcmp(type, "FLAT")) {
@@ -567,6 +581,7 @@ static int vmdk_parse_extents(const char *desc, BlockDriverState *bs,
 
         path_combine(extent_path, sizeof(extent_path),
                 desc_file_path, fname);
+        fprintf(stderr,"ext path %s, desc f %s \n", extent_path, desc_file_path);
         ret = bdrv_file_open(&extent_file, extent_path, bs->open_flags);
         if (ret) {
             return ret;
