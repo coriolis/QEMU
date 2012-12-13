@@ -36,7 +36,12 @@ EMSCRIPTEN_KEEPALIVE __declspec(dllexport) void* qemu_img_open(const char *filen
         fprintf(stderr, "Could not open (error: %d) '%s'", ret, filename);
     }
 
-    printf("Opened file %s\n", filename);
+    fprintf(stderr, "Opened file %s\n", filename);
+    fprintf(stderr, "in QEMU int %d, long %d, ul %d, int64 %d, szt %d, off %d\n",
+            sizeof(int), sizeof(long), sizeof(unsigned long),
+            sizeof(int64_t), sizeof(size_t), sizeof(off_t));
+
+
 
     return bs;
 }
@@ -47,7 +52,7 @@ EMSCRIPTEN_KEEPALIVE __declspec(dllexport) void* qemu_img_open(const char *filen
 EMSCRIPTEN_KEEPALIVE __declspec(dllexport) int qemu_img_read(void *bs, int64_t offset,
                     uint8_t *buf, size_t len)
 {
-    printf("qemu_read off=%ld, len=%ld\n", offset, len);
+    fprintf(stderr, "qemu_read off=%llu, len=%zd\n", (uint64_t)offset, len);
     return bdrv_pread((BlockDriverState *)bs, (uint64_t)offset, buf, len);
 }
 
@@ -64,6 +69,6 @@ EMSCRIPTEN_KEEPALIVE __declspec(dllexport) int qemu_img_get_info(void *bs, int64
     *sect_size = 512;
     *size = *nsectors * (*sect_size);
 
-    printf("Qemu info: sect_size = %ld, size=%ld\n", *sect_size, *size);
+    fprintf(stderr, "Qemu info: sect_size = %u, size=%zd\n", *sect_size, *size);
     return 0;
 }
