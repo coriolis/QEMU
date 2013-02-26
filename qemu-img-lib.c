@@ -37,9 +37,9 @@ EMSCRIPTEN_KEEPALIVE __declspec(dllexport) void* qemu_img_open(const char *filen
     }
 
     fprintf(stderr, "Opened file %s\n", filename);
-    fprintf(stderr, "in QEMU int %d, long %d, ul %d, int64 %d, szt %d, off %d\n",
-            sizeof(int), sizeof(long), sizeof(unsigned long),
-            sizeof(int64_t), sizeof(size_t), sizeof(off_t));
+    //fprintf(stderr, "in QEMU int %d, long %d, ul %d, int64 %d, szt %d, off %d\n",
+            //sizeof(int), sizeof(long), sizeof(unsigned long),
+            //sizeof(int64_t), sizeof(size_t), sizeof(off_t));
 
 
 
