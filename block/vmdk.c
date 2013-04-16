@@ -527,6 +527,91 @@ static int vmdk_open_sparse(BlockDriverState *bs,
     }
 }
 
+#ifdef EMSCRIPTEN
+/* func to scan split file info.
+ * acc, type - expected at least 10 chars long
+ * name - expected at least 512 chars long
+ * This parse string like 
+ * RW 4192256 SPARSE "Windows 2000 Professional-s001.vmdk"
+ */
+static int scan_line(const char *line, char *acc, long long *sec, 
+            char *type, char *name, long long *fo)
+{
+
+    char *s = (char *)line, *e, *end;
+    int i = 0;
+    int fields = 0;
+
+    if(strlen(line) < 10)
+        return -1;
+
+    e = s + strlen(line);
+
+    //skip initial spaces
+    if(isspace(*s)) s++;
+    //scan access
+    for(i=0; i<10 && *s && (!isspace(*s)); i++)
+        acc[i] = *s++;
+        
+    acc[i] = '\0';
+
+    s++;
+    fields++;
+    if(e <= s)
+        return fields;
+
+    //get sectors
+    *sec = strtoll(s, &end, 10);
+
+    //move ahead of number
+    if(end > s)
+       s = ++end;
+
+    fields++;
+    if(e <= s)
+        return fields;
+
+    //scan access
+    for(i=0; i<10 && *s && (!isspace(*s)); i++)
+        type[i] = *s++;
+        
+    type[i] = '\0';
+
+    s++;
+    fields++;
+
+    if(e <= s)
+        return fields;
+
+    if(*s == '"') 
+        s++;
+    else 
+        return fields;
+
+    //scan name
+    for(i=0; i<512 && *s; i++)
+    {
+        if(*s == '"')
+            break;
+        name[i] = *s++;
+    }
+        
+    name[i]='\0';
+    s++;
+    fields++;
+
+    if(e <= s || *s == '\n')
+        *fo = 0;
+    else
+    {
+        *fo = strtoll(s, &end, 10);
+        fields++;
+    }
+
+    return fields;
+}
+#endif
+
 static int vmdk_parse_extents(const char *desc, BlockDriverState *bs,
         const char *desc_file_path)
 {
@@ -539,7 +624,6 @@ static int vmdk_parse_extents(const char *desc, BlockDriverState *bs,
     int64_t flat_offset;
     char extent_path[PATH_MAX];
     BlockDriverState *extent_file;
-    char sudo_fname[512] = { 0 };
 
     while (*p) {
         /* parse extent line:
@@ -549,16 +633,7 @@ static int vmdk_parse_extents(const char *desc, BlockDriverState *bs,
          */
         flat_offset = -1;
 #ifdef EMSCRIPTEN
-        //emscripten cannot scan lld and literal chars
-        //doesn't actually scan lld
-        memset(sudo_fname, 0, sizeof(fname));
-        ret = sscanf(p, "%10s %ld" " %10s %511s %ld",
-                access, &sectors, type, sudo_fname, &flat_offset);
-        if(strlen(sudo_fname) > 2) {
-            memset(fname, 0, sizeof(fname));
-            strncpy(fname, &sudo_fname[1], strlen(sudo_fname)-2);
-        }
-        
+        ret = scan_line(p, access, &sectors, type, fname, &flat_offset);
 #else
         ret = sscanf(p, "%10s %" SCNd64 " %10s \"%511[^\"]\" %" SCNd64,
                 access, &sectors, type, fname, &flat_offset);
@@ -581,7 +656,6 @@ static int vmdk_parse_extents(const char *desc, BlockDriverState *bs,
 
         path_combine(extent_path, sizeof(extent_path),
                 desc_file_path, fname);
-        fprintf(stderr,"ext path %s, desc f %s \n", extent_path, desc_file_path);
         ret = bdrv_file_open(&extent_file, extent_path, bs->open_flags);
         if (ret) {
             return ret;
